@@ -1,23 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Solana Wallet Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { background: #111; color: white; font-family: Arial, sans-serif; padding: 20px; }
-    .token { background: #222; margin: 10px 0; padding: 10px; border-radius: 8px; }
-  </style>
-</head>
-<body>
-
-<h1>Solana Wallet Dashboard</h1>
-<div id="totalValue">Total Portfolio Value: Loading...</div>
-<div id="tokens"></div>
-
 <script>
 const WALLET_ADDRESS = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
 
+// Mint Address to Token Name Map
 const tokenMintMap = {
   "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": "Fartcoin",
   "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "SPX6900",
@@ -26,6 +10,7 @@ const tokenMintMap = {
   "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": "RAY"
 };
 
+// Fetch wallet tokens
 async function fetchWalletTokens() {
   const response = await fetch('/api/proxy-solana', {
     method: 'POST',
@@ -43,31 +28,33 @@ async function fetchWalletTokens() {
   }).filter(Boolean);
 }
 
-async function fetchTokenPrice(mint) {
+// Fetch all token prices once
+async function fetchAllTokenPrices() {
   try {
-    const res = await fetch(`/api/proxy-price?mint=${mint}`);
+    const res = await fetch('/api/proxy-price');
     if (!res.ok) {
-      console.warn(`No price found for ${mint}: ${res.status}`);
-      return null;
+      console.warn('Failed to fetch token prices:', res.status);
+      return {};
     }
     const data = await res.json();
-    if (data && data.data && typeof data.data.value === 'number') {
-      return data.data.value;
-    }
+    return data.prices || {};
   } catch (error) {
-    console.error("Error fetching price from proxy:", error);
+    console.error("Error fetching all prices:", error);
+    return {};
   }
-  return null;
 }
 
+// Update Dashboard
 async function updateDashboard() {
   const tokens = await fetchWalletTokens();
+  const prices = await fetchAllTokenPrices();
+
   let totalValue = 0;
   const tokensDiv = document.getElementById('tokens');
   tokensDiv.innerHTML = '';
 
   for (const token of tokens) {
-    const price = await fetchTokenPrice(token.mint);
+    const price = prices[token.mint] || 0;
     const value = price ? token.amount * price : 0;
     totalValue += value;
 
@@ -76,7 +63,7 @@ async function updateDashboard() {
     tokenDiv.innerHTML = `
       <strong>${token.symbol}</strong><br>
       Balance: ${token.amount.toFixed(2)}<br>
-      Price: ${price ? `$${price.toFixed(4)}` : "No Price"}<br>
+      Price: ${price ? `$${price.toFixed(6)}` : "No Price"}<br>
       Value: $${value.toFixed(2)}
     `;
     tokensDiv.appendChild(tokenDiv);
@@ -85,9 +72,7 @@ async function updateDashboard() {
   document.getElementById('totalValue').innerText = `Total Portfolio Value: $${totalValue.toFixed(2)}`;
 }
 
+// Load dashboard
 updateDashboard();
-setInterval(updateDashboard, 60000);
+setInterval(updateDashboard, 60000); // Refresh every 60 seconds
 </script>
-
-</body>
-</html>
