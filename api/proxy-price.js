@@ -1,28 +1,38 @@
-export default async function handler(req, res) {
-  const { mint } = req.query;
+export const config = {
+  runtime: 'edge', // important: forces Vercel to use native fetch
+};
+
+export default async function handler(req) {
+  const { searchParams } = new URL(req.url);
+  const mint = searchParams.get('mint');
 
   if (!mint) {
-    return res.status(400).json({ message: 'Missing mint address' });
+    return new Response(JSON.stringify({ error: 'Missing mint address' }), { status: 400 });
   }
 
   try {
-    const response = await fetch(`https://public-api.birdeye.so/market/token_price?address=${mint}`, {
+    const apiResponse = await fetch(`https://public-api.birdeye.so/market/token_price?address=${mint}`, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer 5e03e241b51b4ed3946001c68634ddcf`,
         'Accept': 'application/json'
       }
     });
 
-    if (!response.ok) {
-      console.error('Birdeye fetch failed:', await response.text());
-      return res.status(response.status).json({ error: 'Birdeye API fetch failed' });
+    if (!apiResponse.ok) {
+      const text = await apiResponse.text();
+      console.error('Birdeye error response:', text);
+      return new Response(JSON.stringify({ error: 'Birdeye API failed', details: text }), { status: apiResponse.status });
     }
 
-    const data = await response.json();
-    return res.status(200).json(data);
+    const data = await apiResponse.json();
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('Server Error fetching price:', error);
-    return res.status(500).json({ error: 'Server Error fetching price' });
+    console.error('Proxy server error:', error);
+    return new Response(JSON.stringify({ error: 'Internal Server Error (proxy)' }), { status: 500 });
   }
 }
