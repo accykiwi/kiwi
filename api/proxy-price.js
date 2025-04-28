@@ -1,3 +1,5 @@
+import fetch from 'node-fetch'; // Important to use node-fetch in Vercel API routes!
+
 export default async function handler(req, res) {
   const { mint } = req.query;
 
