@@ -4,14 +4,16 @@ export const config = {
 
 export default async function handler(req) {
   const { searchParams } = new URL(req.url);
-  const mint = searchParams.get('mint');
+  const outputMint = searchParams.get('mint'); // The token you want the price for
 
-  if (!mint) {
+  if (!outputMint) {
     return new Response(JSON.stringify({ error: 'Missing mint address' }), { status: 400 });
   }
 
+  const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // USDC Mint Address
+
   try {
-    const response = await fetch(`https://quote-api.jup.ag/v6/price?ids=${mint}`, {
+    const response = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${USDC_MINT}&outputMint=${outputMint}&amount=1000000&slippageBps=50`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
@@ -25,12 +27,18 @@ export default async function handler(req) {
     }
 
     const data = await response.json();
-    const tokenData = data?.data?.[mint];
-    if (!tokenData) {
-      return new Response(JSON.stringify({ error: 'Price not found in Jupiter' }), { status: 404 });
+
+    if (!data.outAmount || !data.inAmount) {
+      return new Response(JSON.stringify({ error: 'Invalid quote data' }), { status: 500 });
     }
 
-    return new Response(JSON.stringify({ value: tokenData.price }), {
+    // Calculate price
+    const outAmountLamports = Number(data.outAmount);
+    const inAmountLamports = Number(data.inAmount);
+
+    const price = outAmountLamports / inAmountLamports;
+
+    return new Response(JSON.stringify({ value: price }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
