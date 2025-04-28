@@ -3,55 +3,55 @@ export const config = {
 };
 
 export default async function handler(req) {
-  const { searchParams } = new URL(req.url);
-  const outputMint = searchParams.get('mint');
-
-  if (!outputMint) {
-    return new Response(JSON.stringify({ error: 'Missing mint address' }), { status: 400 });
-  }
+  const tokenMints = [
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", // Fartcoin
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr", // SPX6900
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9", // GIGACHAD
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"  // RAY
+  ];
 
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
-  // Special case: if asking for USDC, just return 1.0
-  if (outputMint === USDC_MINT) {
-    return new Response(JSON.stringify({ value: 1.0 }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
+  const prices = {};
 
-  try {
-    const response = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${USDC_MINT}&outputMint=${outputMint}&amount=1000000&slippageBps=50`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
+  for (const mint of tokenMints) {
+    // Special case for USDC
+    if (mint === USDC_MINT) {
+      prices[mint] = 1.0;
+      continue;
+    }
+
+    try {
+      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${USDC_MINT}&outputMint=${mint}&amount=1000000&slippageBps=50`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        console.error(`Error fetching price for ${mint}:`, await res.text());
+        prices[mint] = null;
+        continue;
       }
-    });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('Jupiter error response:', text);
-      return new Response(JSON.stringify({ error: 'Jupiter API failed', details: text }), { status: response.status });
+      const data = await res.json();
+      if (data.outAmount && data.inAmount) {
+        const price = Number(data.outAmount) / Number(data.inAmount);
+        prices[mint] = price;
+      } else {
+        prices[mint] = null;
+      }
+
+    } catch (error) {
+      console.error(`Error processing price for ${mint}:`, error);
+      prices[mint] = null;
     }
-
-    const data = await response.json();
-
-    if (!data.outAmount || !data.inAmount) {
-      return new Response(JSON.stringify({ error: 'Invalid quote data' }), { status: 500 });
-    }
-
-    const outAmountLamports = Number(data.outAmount);
-    const inAmountLamports = Number(data.inAmount);
-
-    const price = outAmountLamports / inAmountLamports;
-
-    return new Response(JSON.stringify({ value: price }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-  } catch (error) {
-    console.error('Proxy server error:', error);
-    return new Response(JSON.stringify({ error: 'Internal Server Error (proxy)' }), { status: 500 });
   }
+
+  return new Response(JSON.stringify({ prices }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
