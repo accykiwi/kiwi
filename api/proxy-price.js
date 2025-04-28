@@ -1,5 +1,5 @@
 export const config = {
-  runtime: 'edge', // important: forces Vercel to use native fetch
+  runtime: 'edge', // Use edge runtime to enable fetch without issues
 };
 
 export default async function handler(req) {
@@ -11,22 +11,26 @@ export default async function handler(req) {
   }
 
   try {
-    const apiResponse = await fetch(`https://public-api.birdeye.so/market/token_price?address=${mint}`, {
+    const response = await fetch(`https://price.jup.ag/v4/price?ids=${mint}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer 5e03e241b51b4ed3946001c68634ddcf`,
         'Accept': 'application/json'
       }
     });
 
-    if (!apiResponse.ok) {
-      const text = await apiResponse.text();
-      console.error('Birdeye error response:', text);
-      return new Response(JSON.stringify({ error: 'Birdeye API failed', details: text }), { status: apiResponse.status });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Jupiter error response:', text);
+      return new Response(JSON.stringify({ error: 'Jupiter API failed', details: text }), { status: response.status });
     }
 
-    const data = await apiResponse.json();
-    return new Response(JSON.stringify(data), {
+    const data = await response.json();
+    const tokenData = data?.data?.[mint];
+    if (!tokenData) {
+      return new Response(JSON.stringify({ error: 'Price not found in Jupiter' }), { status: 404 });
+    }
+
+    return new Response(JSON.stringify({ value: tokenData.price }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
