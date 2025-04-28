@@ -1,5 +1,5 @@
 export const config = {
-  runtime: 'edge', // Use edge runtime to enable fetch without issues
+  runtime: 'edge',
 };
 
 export default async function handler(req) {
@@ -11,7 +11,7 @@ export default async function handler(req) {
   }
 
   try {
-    const response = await fetch(`https://price.jup.ag/v4/price?ids=${mint}`, {
+    const response = await fetch(`https://quote-api.jup.ag/v6/price?ids=${mint}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
