@@ -15,7 +15,7 @@ export default async function handler(req) {
   const tokenDecimals = {
     "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
     "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,  // GIGA
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6
   };
 
@@ -49,7 +49,13 @@ export default async function handler(req) {
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6;
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
-        const price = outAmount / inAmount;
+        let price = outAmount / inAmount;
+
+        // ✅ Fix GIGA only
+        if (mint === "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9") {
+          price = price / 10;
+        }
+
         prices[mint] = price;
       } else {
         prices[mint] = null;
