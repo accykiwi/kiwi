@@ -22,7 +22,7 @@ export default async function handler(req) {
     }
 
     try {
-      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${USDC_MINT}&outputMint=${mint}&amount=1000000&slippageBps=50`, {
+      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=1000000&slippageBps=50`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
@@ -38,8 +38,8 @@ export default async function handler(req) {
       const data = await res.json();
 
       if (data.outAmount && data.inAmount) {
-        const outAmount = Number(data.outAmount) / 1e6; // 6 decimals
-        const inAmount = Number(data.inAmount) / 1e6;    // 6 decimals
+        const outAmount = Number(data.outAmount) / 1e6; // USDC has 6 decimals
+        const inAmount = Number(data.inAmount) / 1e6;    // Token has 6 decimals (assumed)
         const price = outAmount / inAmount;
         prices[mint] = price;
       } else {
