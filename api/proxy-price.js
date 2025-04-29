@@ -44,10 +44,10 @@ export default async function handler(req) {
       const data = await res.json();
 
       if (data.outAmount && data.inAmount) {
-        const outAmount = Number(data.outAmount) / 1e6; // normalize USDC always
+        const outAmount = Number(data.outAmount) / 1e6;
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
 
-        const price = outAmount / inAmount; // ✅ Original division
+        const price = outAmount / inAmount;
         prices[mint] = price;
       } else {
         prices[mint] = null;
