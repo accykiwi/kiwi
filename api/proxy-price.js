@@ -52,9 +52,9 @@ export default async function handler(req) {
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
         let price = outAmount / inAmount;
 
-        // ✅ GIGA fix: adjust for 0.1 token quote
+        // ✅ FINAL FIX — divide GIGA by 1000
         if (mint === GIGA_MINT) {
-          price = price / 10;
+          price = price / 1000;
         }
 
         prices[mint] = price;
@@ -73,4 +73,3 @@ export default async function handler(req) {
     headers: { "Content-Type": "application/json" },
   });
 }
-
