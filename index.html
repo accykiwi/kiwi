@@ -1,3 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Solana Wallet Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background: #111; color: white; font-family: Arial, sans-serif; padding: 20px; }
+    .token { background: #222; margin: 10px 0; padding: 10px; border-radius: 8px; }
+  </style>
+</head>
+
+<body>
+
+<h1>Solana Wallet Dashboard</h1>
+
+<!-- ✅ These 2 important divs MUST exist before JavaScript runs -->
+<div id="totalValue">Total Portfolio Value: Loading...</div>
+<div id="tokens"></div>
+
 <script>
 const WALLET_ADDRESS = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
 
@@ -54,8 +74,12 @@ async function updateDashboard() {
   tokensDiv.innerHTML = '';
 
   for (const token of tokens) {
-    const price = prices[token.mint] || 0;
-    const value = price ? token.amount * price : 0;
+    const price = prices[token.mint];
+    if (typeof price !== "number") {
+      console.warn(`Missing price for ${token.mint}`);
+      continue;
+    }
+    const value = token.amount * price;
     totalValue += value;
 
     const tokenDiv = document.createElement('div');
@@ -63,7 +87,7 @@ async function updateDashboard() {
     tokenDiv.innerHTML = `
       <strong>${token.symbol}</strong><br>
       Balance: ${token.amount.toFixed(2)}<br>
-      Price: ${price ? `$${price.toFixed(6)}` : "No Price"}<br>
+      Price: $${price.toFixed(6)}<br>
       Value: $${value.toFixed(2)}
     `;
     tokensDiv.appendChild(tokenDiv);
@@ -72,7 +96,10 @@ async function updateDashboard() {
   document.getElementById('totalValue').innerText = `Total Portfolio Value: $${totalValue.toFixed(2)}`;
 }
 
-// Load dashboard initially
+// Initial Load
 updateDashboard();
-setInterval(updateDashboard, 60000); // Refresh prices and balances every 60 seconds
+setInterval(updateDashboard, 60000); // Refresh every 60 seconds
 </script>
+
+</body>
+</html>
