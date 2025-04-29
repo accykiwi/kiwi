@@ -1,34 +1,40 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Only POST method allowed' });
-  }
-
-  const { wallet } = req.body;
-  if (!wallet) {
-    return res.status(400).json({ message: 'Missing wallet address' });
-  }
+  const { wallet } = await req.json();
+  const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
-    const response = await fetch('https://api.mainnet-beta.solana.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch(solanaEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         id: 1,
-        method: 'getTokenAccountsByOwner',
+        method: "getTokenAccountsByOwner",
         params: [
           wallet,
-          { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
-          { encoding: 'jsonParsed' }
+          { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+          { encoding: "jsonParsed" }
         ]
       })
     });
 
-    const data = await response.json();
-    return res.status(200).json(data);
+    const tokenData = await response.json();
+    const allTokens = tokenData?.result?.value || [];
 
-  } catch (error) {
-    console.error('Error fetching Solana wallet tokens:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    // ✅ Filter out NFTs
+    const realTokens = allTokens.filter(acc => {
+      const info = acc?.account?.data?.parsed?.info;
+      const amount = parseFloat(info?.tokenAmount?.uiAmountString || "0");
+      const decimals = info?.tokenAmount?.decimals;
+
+      // ✅ Real tokens have decimals > 0
+      // ✅ NFTs have decimals = 0 and amount = 1
+      return !(decimals === 0 && amount === 1);
+    });
+
+    return res.status(200).json({ result: { value: realTokens } });
+  } catch (err) {
+    console.error("Wallet fetch error:", err);
+    return res.status(500).json({ result: { value: [] } });
   }
 }
