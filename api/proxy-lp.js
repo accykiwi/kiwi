@@ -3,7 +3,7 @@ export default async function handler(req, res) {
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
-    // 1. Fetch all token accounts for the wallet
+    // Step 1: Fetch wallet token accounts
     const tokenRes = await fetch(solanaEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     const tokenData = await tokenRes.json();
     const tokenAccounts = tokenData?.result?.value || [];
 
-    // 2. Identify NFT LPs (Raydium CLMM NFTs are supply=1 and decimals=0)
+    // Step 2: Filter LP NFTs
     const nftAccounts = tokenAccounts.filter(acc => {
       const info = acc?.account?.data?.parsed?.info;
       return info?.tokenAmount?.amount === "1" && info?.tokenAmount?.decimals === 0;
@@ -32,72 +32,53 @@ export default async function handler(req, res) {
       return res.status(200).json({ positions: [] });
     }
 
-    // 3. Fetch Raydium pools
-    const raydiumPools = await fetchRaydiumPools();
-    if (!raydiumPools.length) {
-      return res.status(500).json({ positions: [] });
-    }
+    // Step 3: Fetch Raydium Pools
+    const raydiumPoolsRes = await fetch('https://api.raydium.io/v2/clmm/pools');
+    const raydiumPools = await raydiumPoolsRes.json();
 
     const positions = [];
 
-    // 4. For each LP NFT, fetch position info
     for (const nft of nftAccounts) {
       const mint = nft.account.data.parsed.info.mint;
-      const positionData = await fetchPositionData(mint);
 
-      if (!positionData) continue;
+      // Step 4: Fetch position-info for the NFT
+      const posRes = await fetch(`https://api.raydium.io/v2/clmm/position-info?mint=${mint}`);
+      if (!posRes.ok) continue;
 
-      const poolInfo = raydiumPools.find(pool => pool.id === positionData.poolId);
-      if (!poolInfo) continue;
+      const positionInfo = await posRes.json();
+      const poolId = positionInfo?.poolId;
+      const liquidity = positionInfo?.liquidity;
+      const tickLower = positionInfo?.tickLowerIndex;
+      const tickUpper = positionInfo?.tickUpperIndex;
 
-      const amountA = Number(positionData.liquidity) / 1e9; // Simplified approximation
-      const amountB = Number(positionData.liquidity) / 1e9; // Simplified approximation
+      if (!poolId || !liquidity || tickLower === undefined || tickUpper === undefined) continue;
+
+      // Step 5: Match poolId to Raydium pool
+      const pool = raydiumPools.find(p => p.id === poolId);
+      if (!pool) continue;
+
+      // Step 6: Convert liquidity into rough amounts (simple approx for now)
+      const amountA = Number(liquidity) / 1e9;
+      const amountB = Number(liquidity) / 1e9;
 
       positions.push({
-        tokenA: poolInfo.mintA,    // ✅ CORRECT: Return real underlying asset mint (SOL, Fartcoin, USDC)
-        tokenB: poolInfo.mintB,    // ✅ CORRECT
-        lowerPrice: tickIndexToPrice(positionData.tickLowerIndex, poolInfo.decimalsA, poolInfo.decimalsB),
-        upperPrice: tickIndexToPrice(positionData.tickUpperIndex, poolInfo.decimalsA, poolInfo.decimalsB),
+        tokenA: pool.mintA,     // ✅ Now returns actual SOL, Fartcoin, USDC
+        tokenB: pool.mintB,
+        lowerPrice: tickIndexToPrice(tickLower, pool.decimalsA, pool.decimalsB),
+        upperPrice: tickIndexToPrice(tickUpper, pool.decimalsA, pool.decimalsB),
         amountA,
         amountB
       });
     }
 
     return res.status(200).json({ positions });
-
   } catch (error) {
-    console.error('Error fetching live LP positions:', error);
+    console.error('Error fetching LP positions:', error);
     return res.status(500).json({ positions: [] });
   }
 }
 
-// Helper: Fetch Raydium Pools
-async function fetchRaydiumPools() {
-  try {
-    const res = await fetch('https://api.raydium.io/v2/clmm/pools');
-    const data = await res.json();
-    return data || [];
-  } catch (err) {
-    console.error('Failed to fetch Raydium pools:', err);
-    return [];
-  }
-}
-
-// Helper: Fetch Position Info
-async function fetchPositionData(mint) {
-  try {
-    const url = `https://api.raydium.io/v2/clmm/position-info?mint=${mint}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.error('Failed to fetch position data:', err);
-    return null;
-  }
-}
-
-// Helper: Convert tick index to price
+// Helper: Tick index to price conversion
 function tickIndexToPrice(tickIndex, decimalsA, decimalsB) {
   const sqrt = Math.pow(1.0001, tickIndex / 2);
   const price = (sqrt * sqrt) * Math.pow(10, decimalsA - decimalsB);
