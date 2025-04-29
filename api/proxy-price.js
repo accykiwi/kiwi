@@ -11,6 +11,7 @@ export default async function handler(req) {
   ];
 
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  const GIGA_MINT = "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9";
 
   const tokenDecimals = {
     "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
@@ -49,11 +50,18 @@ export default async function handler(req) {
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6;
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
-        const price = outAmount / inAmount;
+        let price = outAmount / inAmount;
+
+        // ✅ GIGA fix: adjust for 0.1 token quote
+        if (mint === GIGA_MINT) {
+          price = price / 10;
+        }
+
         prices[mint] = price;
       } else {
         prices[mint] = null;
       }
+
     } catch (error) {
       console.error(`Error processing price for ${mint}:`, error);
       prices[mint] = null;
@@ -65,3 +73,4 @@ export default async function handler(req) {
     headers: { "Content-Type": "application/json" },
   });
 }
+
