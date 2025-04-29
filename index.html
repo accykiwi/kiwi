@@ -1,3 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Solana Wallet Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background: #111; color: white; font-family: Arial, sans-serif; padding: 20px; }
+    .token { background: #222; margin: 10px 0; padding: 10px; border-radius: 8px; }
+  </style>
+</head>
+
+<body>
+
+<h1>Solana Wallet Dashboard</h1>
+
+<!-- ✅ Important Divs -->
+<div id="totalValue">Total Portfolio Value: Loading...</div>
+<div id="tokens"></div>
+
 <script>
 const WALLET_ADDRESS = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
 
@@ -10,7 +30,7 @@ const tokenMintMap = {
   "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": "RAY"
 };
 
-// Mint Address to Token Decimals Map
+// Mint Address to Decimals Map
 const tokenDecimals = {
   "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
   "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900
@@ -63,8 +83,8 @@ async function updateDashboard() {
   tokensDiv.innerHTML = '';
 
   for (const token of tokens) {
-    const decimals = tokenDecimals[token.mint] || 6; // Default to 6 decimals
-    const normalizedAmount = token.amount; // Amount already normalized by RPC (uiAmount)
+    const decimals = tokenDecimals[token.mint] || 6;
+    const normalizedAmount = token.amount; // already uiAmount
     const price = prices[token.mint];
     if (typeof price !== "number") {
       console.warn(`Missing price for ${token.mint}`);
@@ -91,3 +111,6 @@ async function updateDashboard() {
 updateDashboard();
 setInterval(updateDashboard, 60000); // Refresh every 60 seconds
 </script>
+
+</body>
+</html>
