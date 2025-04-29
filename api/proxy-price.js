@@ -40,3 +40,11 @@ export default async function handler(req) {
         prices[mint] = null;
         continue;
       }
+
+      const data = await res.json();
+
+      if (data.outAmount && data.inAmount) {
+        const outAmount = Number(data.outAmount) / 1e6;
+        const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
+
+        let price = outAmount /
