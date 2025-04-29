@@ -17,19 +17,25 @@ export default async function handler(req, res) {
 
   try {
     const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&outputMint=${mint}&amount=1000000`; 
-    // 1 USDC (1e6) input amount
+    // 1 USDC = 1,000,000 (because 6 decimals)
 
     const response = await fetch(quoteUrl);
     const data = await response.json();
 
-    if (!data.data || data.data.length === 0) {
-      return res.status(500).json({ error: 'No route found for this token' });
+    if (!data.data || !data.data.length) {
+      console.error('No route found for mint:', mint);
+      return res.status(200).json({ price: null }); // <-- Don't crash, just return null
     }
 
     const outAmount = data.data[0].outAmount;
     const decimals = TOKEN_DECIMALS[mint];
 
     const normalizedOutAmount = outAmount / Math.pow(10, decimals);
+
+    if (normalizedOutAmount === 0) {
+      console.error('Normalized outAmount is zero for mint:', mint);
+      return res.status(200).json({ price: null });
+    }
 
     const pricePerToken = 1 / normalizedOutAmount;
 
