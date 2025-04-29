@@ -3,41 +3,24 @@ export const config = {
 };
 
 export default async function handler(req) {
-  const tokenMints = [
-    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", // Fartcoin
-    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr", // SPX6900
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9", // GIGACHAD
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"  // RAY
-  ];
-
-  const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-
-  const tokenDecimals = {
-    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
-    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6,
-    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6
+  const tokenPairs = {
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": "<Fartcoin/SOL pair address>",
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "<SPX/SOL pair address>",
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": "<GIGA/SOL pair address>",
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": null, // USDC
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": null  // RAY
   };
 
   const prices = {};
 
-  for (const mint of tokenMints) {
-    if (mint === USDC_MINT) {
-      prices[mint] = 1.0;
+  for (const [mint, pairAddress] of Object.entries(tokenPairs)) {
+    if (!pairAddress) {
+      prices[mint] = (mint === "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v") ? 1.0 : null;
       continue;
     }
 
     try {
-      const amount = Math.pow(10, tokenDecimals[mint] || 6); // 🔥 Correct amount = 1 full token
-      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=${amount}&slippageBps=50`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/pairs/solana/${pairAddress}`);
       if (!res.ok) {
         console.error(`Error fetching price for ${mint}:`, await res.text());
         prices[mint] = null;
@@ -45,13 +28,9 @@ export default async function handler(req) {
       }
 
       const data = await res.json();
+      const priceUsd = data.pair.priceUsd;
 
-      if (data.outAmount) {
-        const outAmount = Number(data.outAmount) / 1e6; // normalize USDC
-        prices[mint] = outAmount;
-      } else {
-        prices[mint] = null;
-      }
+      prices[mint] = priceUsd ? parseFloat(priceUsd) : null;
 
     } catch (error) {
       console.error(`Error processing price for ${mint}:`, error);
