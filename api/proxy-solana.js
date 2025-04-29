@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const { wallet } = await req.json();
+  const wallet = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku"; // ✅ Hardcoded correctly
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
@@ -27,8 +27,7 @@ export default async function handler(req, res) {
       const amount = parseFloat(info?.tokenAmount?.uiAmountString || "0");
       const decimals = info?.tokenAmount?.decimals;
 
-      // ✅ Real tokens have decimals > 0
-      // ✅ NFTs have decimals = 0 and amount = 1
+      // ✅ Exclude NFTs: (decimals === 0 && amount === 1)
       return !(decimals === 0 && amount === 1);
     });
 
