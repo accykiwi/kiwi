@@ -1,4 +1,4 @@
-// /pages/api/proxy-price.js (LAST WORKING VERSION)
+// /pages/api/proxy-price.js
 
 export default async function handler(req, res) {
   const BASE_AMOUNT = 100_000_000;
@@ -39,7 +39,6 @@ export default async function handler(req, res) {
 
       let price = data?.data?.[0]?.outAmount / BASE_AMOUNT;
 
-      // Special fix for GIGACHAD only
       if (token.fix === 'giga') {
         price = price / 1000;
       }
