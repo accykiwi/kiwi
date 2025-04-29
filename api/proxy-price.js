@@ -11,7 +11,6 @@ export default async function handler(req) {
   ];
 
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-  const GIGA_MINT = "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9";
 
   const tokenDecimals = {
     "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
@@ -50,13 +49,7 @@ export default async function handler(req) {
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6;
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
-        let price = outAmount / inAmount;
-
-        // ✅ Special fix for GIGA
-        if (mint === GIGA_MINT) {
-          price = price / 1000;
-        }
-
+        const price = outAmount / inAmount;
         prices[mint] = price;
       } else {
         prices[mint] = null;
