@@ -3,7 +3,7 @@ export default async function handler(req, res) {
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
-    // Step 1: Get token accounts from wallet
+    // 1. Fetch token accounts (NFTs included)
     const tokenRes = await fetch(solanaEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -20,10 +20,10 @@ export default async function handler(req, res) {
     });
 
     const tokenData = await tokenRes.json();
-    const tokenAccounts = tokenData?.result?.value || [];
+    const accounts = tokenData?.result?.value || [];
 
-    // Step 2: Identify NFT LPs (Raydium CLMM positions)
-    const nftMints = tokenAccounts
+    // 2. Filter NFT mint addresses
+    const nftMints = accounts
       .filter(acc => {
         const info = acc?.account?.data?.parsed?.info;
         return info?.tokenAmount?.amount === "1" && info?.tokenAmount?.decimals === 0;
@@ -34,33 +34,36 @@ export default async function handler(req, res) {
       return res.status(200).json({ positions: [] });
     }
 
-    // Step 3: Fetch Raydium pool list
-    const poolsRes = await fetch('https://api.raydium.io/v2/clmm/pools');
-    const pools = await poolsRes.json();
+    // 3. Fetch Raydium CLMM pools
+    const poolRes = await fetch("https://api.raydium.io/v2/clmm/pools");
+    const pools = await poolRes.json();
 
     const positions = [];
 
     for (const mint of nftMints) {
-      // Step 4: Fetch position-info for the NFT
-      const posRes = await fetch(`https://api.raydium.io/v2/clmm/position-info?mint=${mint}`);
-      if (!posRes.ok) continue;
+      // 4. Fetch NFT position info
+      const infoRes = await fetch(`https://api.raydium.io/v2/clmm/position-info?mint=${mint}`);
+      if (!infoRes.ok) continue;
 
-      const info = await posRes.json();
+      const info = await infoRes.json();
       const pool = pools.find(p => p.id === info.poolId);
       if (!pool) continue;
 
-      // Step 5: Add only real token mints back
-      const liquidity = Number(info.liquidity);
-      const amountA = liquidity / 1e9;
-      const amountB = liquidity / 1e9;
+      // 5. Final token mints (real tokens only)
+      const mintA = pool.mintA;
+      const mintB = pool.mintB;
 
+      const amountA = Number(info.liquidity) / 1e9;
+      const amountB = Number(info.liquidity) / 1e9;
+
+      // 6. Return only real mints (no NFT junk)
       positions.push({
-        tokenA: pool.mintA, // ✅ SOL, Fartcoin, or USDC
-        tokenB: pool.mintB,
-        lowerPrice: tickIndexToPrice(info.tickLowerIndex, pool.decimalsA, pool.decimalsB),
-        upperPrice: tickIndexToPrice(info.tickUpperIndex, pool.decimalsA, pool.decimalsB),
+        tokenA: mintA,
+        tokenB: mintB,
         amountA,
-        amountB
+        amountB,
+        lowerPrice: tickIndexToPrice(info.tickLowerIndex, pool.decimalsA, pool.decimalsB),
+        upperPrice: tickIndexToPrice(info.tickUpperIndex, pool.decimalsA, pool.decimalsB)
       });
     }
 
@@ -71,7 +74,7 @@ export default async function handler(req, res) {
   }
 }
 
-// Tick index to price
+// Convert tick index to price
 function tickIndexToPrice(tickIndex, decimalsA, decimalsB) {
   const sqrt = Math.pow(1.0001, tickIndex / 2);
   return sqrt * sqrt * Math.pow(10, decimalsA - decimalsB);
