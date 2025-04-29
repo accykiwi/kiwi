@@ -3,7 +3,7 @@ export default async function handler(req, res) {
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
-    // Fetch all token accounts owned by your wallet
+    // 1. Fetch all token accounts for the wallet
     const tokenRes = await fetch(solanaEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -22,16 +22,17 @@ export default async function handler(req, res) {
     const tokenData = await tokenRes.json();
     const tokenAccounts = tokenData?.result?.value || [];
 
-    // Filter NFT tokens (supply = 1, decimals = 0)
+    // 2. Identify NFT LPs (Raydium CLMM NFTs are supply=1 and decimals=0)
     const nftAccounts = tokenAccounts.filter(acc => {
       const info = acc?.account?.data?.parsed?.info;
       return info?.tokenAmount?.amount === "1" && info?.tokenAmount?.decimals === 0;
     });
 
     if (nftAccounts.length === 0) {
-      return res.status(200).json({ positions: [] }); // No LP NFTs found
+      return res.status(200).json({ positions: [] });
     }
 
+    // 3. Fetch Raydium pools
     const raydiumPools = await fetchRaydiumPools();
     if (!raydiumPools.length) {
       return res.status(500).json({ positions: [] });
@@ -39,6 +40,7 @@ export default async function handler(req, res) {
 
     const positions = [];
 
+    // 4. For each LP NFT, fetch position info
     for (const nft of nftAccounts) {
       const mint = nft.account.data.parsed.info.mint;
       const positionData = await fetchPositionData(mint);
@@ -48,15 +50,12 @@ export default async function handler(req, res) {
       const poolInfo = raydiumPools.find(pool => pool.id === positionData.poolId);
       if (!poolInfo) continue;
 
-      // Calculate amounts from liquidity
-      const sqrtPriceX64 = BigInt(poolInfo.sqrtPriceX64);
-      const liquidity = BigInt(positionData.liquidity);
-      const amountA = Number(liquidity) / 1e9; // Approximation for now
-      const amountB = Number(liquidity) / 1e9; // Approximation for now
+      const amountA = Number(positionData.liquidity) / 1e9; // Simplified approximation
+      const amountB = Number(positionData.liquidity) / 1e9; // Simplified approximation
 
       positions.push({
-        tokenA: poolInfo.mintA,
-        tokenB: poolInfo.mintB,
+        tokenA: poolInfo.mintA,    // ✅ CORRECT: Return real underlying asset mint (SOL, Fartcoin, USDC)
+        tokenB: poolInfo.mintB,    // ✅ CORRECT
         lowerPrice: tickIndexToPrice(positionData.tickLowerIndex, poolInfo.decimalsA, poolInfo.decimalsB),
         upperPrice: tickIndexToPrice(positionData.tickUpperIndex, poolInfo.decimalsA, poolInfo.decimalsB),
         amountA,
@@ -65,13 +64,14 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ positions });
+
   } catch (error) {
     console.error('Error fetching live LP positions:', error);
     return res.status(500).json({ positions: [] });
   }
 }
 
-// Helper to fetch Raydium CLMM Pools
+// Helper: Fetch Raydium Pools
 async function fetchRaydiumPools() {
   try {
     const res = await fetch('https://api.raydium.io/v2/clmm/pools');
@@ -83,7 +83,7 @@ async function fetchRaydiumPools() {
   }
 }
 
-// Helper to fetch a single position NFT metadata
+// Helper: Fetch Position Info
 async function fetchPositionData(mint) {
   try {
     const url = `https://api.raydium.io/v2/clmm/position-info?mint=${mint}`;
@@ -97,7 +97,7 @@ async function fetchPositionData(mint) {
   }
 }
 
-// Helper to convert tick index to price
+// Helper: Convert tick index to price
 function tickIndexToPrice(tickIndex, decimalsA, decimalsB) {
   const sqrt = Math.pow(1.0001, tickIndex / 2);
   const price = (sqrt * sqrt) * Math.pow(10, decimalsA - decimalsB);
