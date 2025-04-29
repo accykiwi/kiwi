@@ -1,83 +1,38 @@
 export default async function handler(req, res) {
-  const tokenMints = {
-    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
-    "J3NKxxXZcnNiMjKw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9, // GIGACHAD
-    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6, // USDC
-    "4k3Dyjzvzp8mZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6  // RAY
+  const mintToCoingeckoId = {
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": "fartcoin", // Fartcoin
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "spx6900",  // SPX6900
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": "gigachad", // GIGACHAD
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "usd-coin", // USDC
+    "4k3Dyjzvzp8mZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": "raydium"   // RAY
   };
 
-  const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-  const birdeyeApiKey = "5e03e241b51b4ed3946001c68634ddcf";
+  const mints = Object.keys(mintToCoingeckoId);
+  const ids = Object.values(mintToCoingeckoId).join(",");
 
-  const dexScreenerPages = {
-    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "https://dexscreener.com/solana/2wZGhBRVZutphN1Y5AXbVCZxZ62pysez3zrNVqGfTHFS", // SPX pool page
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": "https://dexscreener.com/solana/4twnR1chjTTzoEFcpY5jaCzLfZCgjZL3tNN81GuuhBGe"  // GIGA pool page
-  };
-
-  const prices = {};
-
-  for (const [mint, decimals] of Object.entries(tokenMints)) {
-    if (mint === USDC_MINT) {
-      prices[mint] = 1.0;
-      continue;
-    }
-
-    if (mint in dexScreenerPages) {
-      // 🚨 Scrape Dexscreener webpage for GIGA and SPX
-      try {
-        const pageUrl = dexScreenerPages[mint];
-        const response = await fetch(pageUrl);
-
-        if (response.ok) {
-          const html = await response.text();
-          const match = html.match(/"priceUsd":([0-9.]+)/);
-
-          if (match && match[1]) {
-            prices[mint] = parseFloat(match[1]);
-            continue;
-          } else {
-            console.error(`Dexscreener price parsing failed for ${mint}`);
-            prices[mint] = null;
-            continue;
-          }
-        } else {
-          console.error(`Dexscreener fetch failed for ${mint}:`, await response.text());
-          prices[mint] = null;
-          continue;
-        }
-      } catch (err) {
-        console.error(`Error scraping Dexscreener for ${mint}:`, err);
-        prices[mint] = null;
-        continue;
+  try {
+    const coingeckoRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
       }
+    });
+
+    if (!coingeckoRes.ok) {
+      console.error('Error fetching from CoinGecko:', await coingeckoRes.text());
+      return res.status(500).json({ prices: {} });
     }
 
-    // 🔵 Fetch from Birdeye normally for Fartcoin
-    try {
-      const birdeyeRes = await fetch(`https://public-api.birdeye.so/public/price?address=${mint}`, {
-        headers: {
-          'Authorization': `Bearer ${birdeyeApiKey}`,
-          'Accept': 'application/json'
-        }
-      });
+    const data = await coingeckoRes.json();
+    const prices = {};
 
-      if (birdeyeRes.ok) {
-        const birdeyeData = await birdeyeRes.json();
-        if (birdeyeData?.data?.value) {
-          prices[mint] = parseFloat(birdeyeData.data.value);
-        } else {
-          prices[mint] = null;
-        }
-      } else {
-        console.error(`Birdeye fetch failed for ${mint}:`, await birdeyeRes.text());
-        prices[mint] = null;
-      }
-    } catch (err) {
-      console.error(`Error fetching from Birdeye for ${mint}:`, err);
-      prices[mint] = null;
+    for (const [mint, coingeckoId] of Object.entries(mintToCoingeckoId)) {
+      prices[mint] = data[coingeckoId]?.usd ?? null;
     }
+
+    return res.status(200).json({ prices });
+  } catch (error) {
+    console.error('Unexpected error fetching from CoinGecko:', error);
+    return res.status(500).json({ prices: {} });
   }
-
-  res.status(200).json({ prices });
 }
