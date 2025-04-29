@@ -15,7 +15,7 @@ export default async function handler(req) {
   const tokenDecimals = {
     "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
     "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,  // GIGA
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,  // GIGACHAD
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6
   };
 
@@ -27,9 +27,14 @@ export default async function handler(req) {
       continue;
     }
 
+    const decimals = tokenDecimals[mint] || 6;
+
+    // ✅ Quote 1 full token (depends on decimals)
+    const amount = Math.pow(10, decimals);
+
     try {
       const res = await fetch(
-        `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=100000000&slippageBps=50`,
+        `https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=${amount}&slippageBps=50`,
         {
           method: "GET",
           headers: {
@@ -48,18 +53,14 @@ export default async function handler(req) {
 
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6;
-        const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
-        let price = outAmount / inAmount;
-
-        // ✅ Fix GIGA only
-        if (mint === "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9") {
-          price = price / 10;
-        }
+        const inAmount = Number(data.inAmount) / 1; // We quoted exactly 1 token
+        const price = outAmount / inAmount;
 
         prices[mint] = price;
       } else {
         prices[mint] = null;
       }
+
     } catch (error) {
       console.error(`Error processing price for ${mint}:`, error);
       prices[mint] = null;
