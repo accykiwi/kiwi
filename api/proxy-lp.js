@@ -3,7 +3,7 @@ export default async function handler(req, res) {
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
-    // Fetch all token accounts for the wallet
+    // Fetch all token accounts owned by your wallet
     const tokenRes = await fetch(solanaEndpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -22,69 +22,84 @@ export default async function handler(req, res) {
     const tokenData = await tokenRes.json();
     const tokenAccounts = tokenData?.result?.value || [];
 
-    // Find NFT LPs (Raydium CLMM NFTs are supply = 1 and special mint addresses)
-    const lpNFTs = tokenAccounts.filter(acc => {
+    // Filter NFT tokens (supply = 1, decimals = 0)
+    const nftAccounts = tokenAccounts.filter(acc => {
       const info = acc?.account?.data?.parsed?.info;
       return info?.tokenAmount?.amount === "1" && info?.tokenAmount?.decimals === 0;
     });
 
-    if (lpNFTs.length === 0) {
+    if (nftAccounts.length === 0) {
       return res.status(200).json({ positions: [] }); // No LP NFTs found
+    }
+
+    const raydiumPools = await fetchRaydiumPools();
+    if (!raydiumPools.length) {
+      return res.status(500).json({ positions: [] });
     }
 
     const positions = [];
 
-    for (const nft of lpNFTs) {
-      const mintAddress = nft.account.data.parsed.info.mint;
+    for (const nft of nftAccounts) {
+      const mint = nft.account.data.parsed.info.mint;
+      const positionData = await fetchPositionData(mint);
 
-      // Fetch on-chain metadata account for the NFT
-      const metadataPDA = await fetchMetadataPDA(mintAddress);
-      if (!metadataPDA) continue;
+      if (!positionData) continue;
 
-      const { tokenA, tokenB, lowerPrice, upperPrice, amountA, amountB } = metadataPDA;
+      const poolInfo = raydiumPools.find(pool => pool.id === positionData.poolId);
+      if (!poolInfo) continue;
+
+      // Calculate amounts from liquidity
+      const sqrtPriceX64 = BigInt(poolInfo.sqrtPriceX64);
+      const liquidity = BigInt(positionData.liquidity);
+      const amountA = Number(liquidity) / 1e9; // Approximation for now
+      const amountB = Number(liquidity) / 1e9; // Approximation for now
 
       positions.push({
-        tokenA,
-        tokenB,
-        lowerPrice,
-        upperPrice,
+        tokenA: poolInfo.mintA,
+        tokenB: poolInfo.mintB,
+        lowerPrice: tickIndexToPrice(positionData.tickLowerIndex, poolInfo.decimalsA, poolInfo.decimalsB),
+        upperPrice: tickIndexToPrice(positionData.tickUpperIndex, poolInfo.decimalsA, poolInfo.decimalsB),
         amountA,
         amountB
       });
     }
 
     return res.status(200).json({ positions });
-
   } catch (error) {
-    console.error('Error fetching LP positions:', error);
+    console.error('Error fetching live LP positions:', error);
     return res.status(500).json({ positions: [] });
   }
 }
 
-// Helper: Fetch fake metadata for testing
-// In real world you decode on-chain accounts, but for now using fake simple match
-async function fetchMetadataPDA(mint) {
-  // Example hardcoded mapping
-  const fakeMetadata = {
-    // Your SOL/Fartcoin LP NFT mint address
-    "69kdRLyP5DTRkpHraaSZAQbWmAwzF9guKjZfzMXzcbAs": {
-      tokenA: "So11111111111111111111111111111111111111112",
-      tokenB: "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
-      lowerPrice: 121.554248,
-      upperPrice: 148.569166,
-      amountA: 2.31,
-      amountB: 1298.12
-    },
-    // Your SOL/USDC LP NFT mint address
-    "DEr6v1q7w4vPRMUSgRwdpsV8Pdvt96KipzpuwpKUr6q3": {
-      tokenA: "So11111111111111111111111111111111111111112",
-      tokenB: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-      lowerPrice: 136.272279,
-      upperPrice: 166.558217,
-      amountA: 2.08,
-      amountB: 441.00
-    }
-  };
+// Helper to fetch Raydium CLMM Pools
+async function fetchRaydiumPools() {
+  try {
+    const res = await fetch('https://api.raydium.io/v2/clmm/pools');
+    const data = await res.json();
+    return data || [];
+  } catch (err) {
+    console.error('Failed to fetch Raydium pools:', err);
+    return [];
+  }
+}
 
-  return fakeMetadata[mint] || null;
+// Helper to fetch a single position NFT metadata
+async function fetchPositionData(mint) {
+  try {
+    const url = `https://api.raydium.io/v2/clmm/position-info?mint=${mint}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch position data:', err);
+    return null;
+  }
+}
+
+// Helper to convert tick index to price
+function tickIndexToPrice(tickIndex, decimalsA, decimalsB) {
+  const sqrt = Math.pow(1.0001, tickIndex / 2);
+  const price = (sqrt * sqrt) * Math.pow(10, decimalsA - decimalsB);
+  return price;
 }
