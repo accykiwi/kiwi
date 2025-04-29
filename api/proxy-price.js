@@ -48,7 +48,14 @@ export default async function handler(req) {
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6; // USDC always 6 decimals
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6); // token decimals
-        const price = inAmount / outAmount; // ✅ FIX: Correct division direction!
+
+        let price;
+        if (tokenDecimals[mint] === 9) {
+          price = inAmount / outAmount;
+        } else {
+          price = outAmount / inAmount;
+        }
+
         prices[mint] = price;
       } else {
         prices[mint] = null;
