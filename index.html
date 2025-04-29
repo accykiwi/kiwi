@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Solana Wallet Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background: #111; color: white; font-family: Arial, sans-serif; padding: 20px; }
+    .token { background: #222; margin: 10px 0; padding: 10px; border-radius: 8px; }
+  </style>
+</head>
+
+<body>
+
+<h1>Solana Wallet Dashboard</h1>
+
+<!-- ✅ Display -->
+<div id="totalValue">Total Portfolio Value: Loading...</div>
+<div id="tokens"></div>
+
+<script>
+const WALLET_ADDRESS = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
+
+// Mint-to-symbol map
+const tokenMintMap = {
+  "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": "Fartcoin",
+  "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "SPX6900",
+  "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": "GIGACHAD",
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "USDC",
+  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": "RAY"
+};
+
+// Mint-to-decimals map
+const tokenDecimals = {
+  "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
+  "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
+  "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6,
+  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6
+};
+
+// Fetch wallet tokens
+async function fetchWalletTokens() {
+  const response = await fetch('/api/proxy-solana', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wallet: WALLET_ADDRESS })
+  });
+  const data = await response.json();
+  return (data?.result?.value || []).map(account => {
+    const info = account?.account?.data?.parsed?.info;
+    if (!info) return null;
+    const mint = info.mint;
+    const symbol = tokenMintMap[mint] || "Unknown";
+    const amount = parseFloat(info.tokenAmount?.uiAmount || 0);
+    return { symbol, amount, mint };
+  }).filter(Boolean);
+}
+
+// Fetch all token prices
+async function fetchAllTokenPrices() {
+  try {
+    const res = await fetch('/api/proxy-price');
+    if (!res.ok) {
+      console.warn('Failed to fetch token prices:', res.status);
+      return {};
+    }
+    const data = await res.json();
+    return data.prices || {};
+  } catch (error) {
+    console.error("Error fetching all prices:", error);
+    return {};
+  }
+}
+
+// Update the dashboard
+async function updateDashboard() {
+  const tokens = await fetchWalletTokens();
+  const prices = await fetchAllTokenPrices();
+
+  let totalValue = 0;
+  const tokensDiv = document.getElementById('tokens');
+  tokensDiv.innerHTML = '';
+
+  for (const token of tokens) {
+    const decimals = tokenDecimals[token.mint] || 6;
+    const normalizedAmount = token.amount; // already in UI amount
+    const price = prices[token.mint];
+    if (typeof price !== "number") {
+      console.warn(`Missing price for ${token.mint}`);
+      continue;
+    }
+
+    // ✅ GIGA FIX — adjust displayed value for correct balance
+    let adjustedAmount = normalizedAmount;
+    if (token.mint === "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9") {
+      adjustedAmount = adjustedAmount / 10;
+    }
+
+    const value = adjustedAmount * price;
+    totalValue += value;
+
+    const tokenDiv = document.createElement('div');
+    tokenDiv.className = 'token';
+    tokenDiv.innerHTML = `
+      <strong>${token.symbol}</strong><br>
+      Balance: ${normalizedAmount.toFixed(6)}<br>
+      Price: $${price.toFixed(6)}<br>
+      Value: $${value.toFixed(2)}
+    `;
+    tokensDiv.appendChild(tokenDiv);
+  }
+
+  document.getElementById('totalValue').innerText = `Total Portfolio Value: $${totalValue.toFixed(2)}`;
+}
+
+// Initial load and refresh every 60s
+updateDashboard();
+setInterval(updateDashboard, 60000);
+</script>
+
+</body>
+</html>
