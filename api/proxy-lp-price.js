@@ -13,6 +13,7 @@ export default async function handler(req, res) {
     {
       symbol: 'SPX6900',
       mint: 'J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr',
+      fix: 'spx',
     },
     {
       symbol: 'Fartcoin',
@@ -40,6 +41,9 @@ export default async function handler(req, res) {
       let price = data?.data?.[0]?.outAmount / BASE_AMOUNT;
 
       if (token.fix === 'giga') {
+        price = price / 1000;
+      }
+      if (token.fix === 'spx') {
         price = price / 1000;
       }
 
