@@ -1,38 +1,69 @@
-export default async function handler(req, res) {
-  const mintToCoingeckoId = {
-    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": "fartcoin", // Fartcoin
-    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "spx6900",  // SPX6900
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": "gigachad", // GIGACHAD
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "usd-coin", // USDC
-    "4k3Dyjzvzp8mZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": "raydium"   // RAY
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(req) {
+  const tokenMints = [
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", // Fartcoin
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr", // SPX6900
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9", // GIGACHAD
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"  // ✅ RAY (newly fixed)
+  ];
+
+  const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+  const tokenDecimals = {
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6,
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6
   };
 
-  const mints = Object.keys(mintToCoingeckoId);
-  const ids = Object.values(mintToCoingeckoId).join(",");
+  const prices = {};
 
-  try {
-    const coingeckoRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
+  for (const mint of tokenMints) {
+    if (mint === USDC_MINT) {
+      prices[mint] = 1.0;
+      continue;
+    }
+
+    try {
+      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=100000000&slippageBps=50`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        console.error(`Error fetching price for ${mint}:`, await res.text());
+        prices[mint] = null;
+        continue;
       }
-    });
 
-    if (!coingeckoRes.ok) {
-      console.error('Error fetching from CoinGecko:', await coingeckoRes.text());
-      return res.status(500).json({ prices: {} });
+      const data = await res.json();
+
+      if (data.outAmount && data.inAmount) {
+        const outAmount = Number(data.outAmount) / 1e6; // normalize USDC always
+        const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
+
+        const price = outAmount / inAmount; // ✅ Proper division
+
+        prices[mint] = price;
+      } else {
+        prices[mint] = null;
+      }
+
+    } catch (error) {
+      console.error(`Error processing price for ${mint}:`, error);
+      prices[mint] = null;
     }
-
-    const data = await coingeckoRes.json();
-    const prices = {};
-
-    for (const [mint, coingeckoId] of Object.entries(mintToCoingeckoId)) {
-      prices[mint] = data[coingeckoId]?.usd ?? null;
-    }
-
-    return res.status(200).json({ prices });
-  } catch (error) {
-    console.error('Unexpected error fetching from CoinGecko:', error);
-    return res.status(500).json({ prices: {} });
   }
+
+  return new Response(JSON.stringify({ prices }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
 }
