@@ -16,7 +16,6 @@ export default async function handler(req) {
   const prices = {};
 
   for (const mint of tokenMints) {
-    // Special case for USDC
     if (mint === USDC_MINT) {
       prices[mint] = 1.0;
       continue;
@@ -37,8 +36,11 @@ export default async function handler(req) {
       }
 
       const data = await res.json();
+
       if (data.outAmount && data.inAmount) {
-        const price = Number(data.outAmount) / Number(data.inAmount);
+        const outAmount = Number(data.outAmount) / 1e6; // 6 decimals
+        const inAmount = Number(data.inAmount) / 1e6;    // 6 decimals
+        const price = outAmount / inAmount;
         prices[mint] = price;
       } else {
         prices[mint] = null;
