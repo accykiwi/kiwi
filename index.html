@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { background: #111; color: white; font-family: Arial, sans-serif; padding: 20px; }
-    .token { background: #222; margin: 10px 0; padding: 10px; border-radius: 8px; }
+    .token, .lp { background: #222; margin: 10px 0; padding: 10px; border-radius: 8px; }
   </style>
 </head>
 
@@ -16,7 +16,12 @@
 
 <!-- ✅ Important Divs -->
 <div id="totalValue">Total Portfolio Value: Loading...</div>
+
+<h2>Wallet Tokens</h2>
 <div id="tokens"></div>
+
+<h2>LP Positions</h2>
+<div id="lp-positions"></div>
 
 <script>
 const WALLET_ADDRESS = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
@@ -32,11 +37,11 @@ const tokenMintMap = {
 
 // Mint Address to Decimals Map
 const tokenDecimals = {
-  "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
-  "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900
-  "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9, // GIGACHAD
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6, // USDC
-  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6  // RAY
+  "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
+  "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
+  "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6,
+  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6
 };
 
 // Fetch wallet tokens
@@ -57,7 +62,23 @@ async function fetchWalletTokens() {
   }).filter(Boolean);
 }
 
-// Fetch all token prices at once
+// Fetch LP positions
+async function fetchLPPositions() {
+  try {
+    const res = await fetch('/api/proxy-lp');
+    if (!res.ok) {
+      console.warn('Failed to fetch LP positions');
+      return [];
+    }
+    const data = await res.json();
+    return data.positions || [];
+  } catch (err) {
+    console.error('Error fetching LP positions:', err);
+    return [];
+  }
+}
+
+// Fetch all token prices
 async function fetchAllTokenPrices() {
   try {
     const res = await fetch('/api/proxy-price');
@@ -76,15 +97,18 @@ async function fetchAllTokenPrices() {
 // Update Dashboard
 async function updateDashboard() {
   const tokens = await fetchWalletTokens();
+  const lpPositions = await fetchLPPositions();
   const prices = await fetchAllTokenPrices();
 
   let totalValue = 0;
+
+  // Wallet tokens
   const tokensDiv = document.getElementById('tokens');
   tokensDiv.innerHTML = '';
 
   for (const token of tokens) {
     const decimals = tokenDecimals[token.mint] || 6;
-    const normalizedAmount = token.amount; // already uiAmount
+    const normalizedAmount = token.amount;
     const price = prices[token.mint];
     if (typeof price !== "number") {
       console.warn(`Missing price for ${token.mint}`);
@@ -102,6 +126,32 @@ async function updateDashboard() {
       Value: $${value.toFixed(2)}
     `;
     tokensDiv.appendChild(tokenDiv);
+  }
+
+  // LP positions
+  const lpDiv = document.getElementById('lp-positions');
+  lpDiv.innerHTML = '';
+
+  for (const lp of lpPositions) {
+    const amountA = Number(lp.amountA) / 1e6; // Assuming 6 decimals for now
+    const amountB = Number(lp.amountB) / 1e6;
+
+    const priceA = prices[lp.tokenA] || 0;
+    const priceB = prices[lp.tokenB] || 0;
+
+    const valueA = amountA * priceA;
+    const valueB = amountB * priceB;
+    const lpValue = valueA + valueB;
+    totalValue += lpValue;
+
+    const lpEntry = document.createElement('div');
+    lpEntry.className = 'lp';
+    lpEntry.innerHTML = `
+      <strong>Pool:</strong> ${tokenMintMap[lp.tokenA] || lp.tokenA} / ${tokenMintMap[lp.tokenB] || lp.tokenB}<br>
+      Range: ${lp.lowerPrice.toFixed(2)} - ${lp.upperPrice.toFixed(2)}<br>
+      LP Value: $${lpValue.toFixed(2)}
+    `;
+    lpDiv.appendChild(lpEntry);
   }
 
   document.getElementById('totalValue').innerText = `Total Portfolio Value: $${totalValue.toFixed(2)}`;
