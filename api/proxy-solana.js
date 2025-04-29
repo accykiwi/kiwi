@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const wallet = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku"; // ✅ Hardcoded correctly
+  const wallet = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
 
   try {
@@ -21,14 +21,14 @@ export default async function handler(req, res) {
     const tokenData = await response.json();
     const allTokens = tokenData?.result?.value || [];
 
-    // ✅ Filter out NFTs
+    // ✅ New strict NFT filter
     const realTokens = allTokens.filter(acc => {
       const info = acc?.account?.data?.parsed?.info;
-      const amount = parseFloat(info?.tokenAmount?.uiAmountString || "0");
-      const decimals = info?.tokenAmount?.decimals;
+      const amountRaw = info?.tokenAmount?.amount || "0";
+      const decimals = info?.tokenAmount?.decimals ?? 0;
 
-      // ✅ Exclude NFTs: (decimals === 0 && amount === 1)
-      return !(decimals === 0 && amount === 1);
+      // ✅ NFTs always have exact "1" amount and 0 decimals
+      return !(amountRaw === "1" && decimals === 0);
     });
 
     return res.status(200).json({ result: { value: realTokens } });
