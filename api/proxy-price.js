@@ -1,8 +1,8 @@
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs', // 🚨 NOT 'edge' anymore
 };
 
-export default async function handler(req) {
+export default async function handler(req, res) {
   const tokenMints = {
     "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
     "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900
@@ -28,65 +28,17 @@ export default async function handler(req) {
     }
 
     if (mint in dexScreenerPages) {
-      // Special case: scrape from Dexscreener web page
+      // 🚨 Scrape from Dexscreener webpage for GIGA and SPX
       try {
         const pageUrl = dexScreenerPages[mint];
-        const res = await fetch(pageUrl);
+        const response = await fetch(pageUrl);
 
-        if (res.ok) {
-          const html = await res.text();
+        if (response.ok) {
+          const html = await response.text();
           const match = html.match(/"priceUsd":([0-9.]+)/);
 
           if (match && match[1]) {
             prices[mint] = parseFloat(match[1]);
             continue;
           } else {
-            console.error(`Price parsing failed for ${mint}`);
-            prices[mint] = null;
-            continue;
-          }
-        } else {
-          console.error(`Dexscreener fetch failed for ${mint}:`, await res.text());
-          prices[mint] = null;
-          continue;
-        }
-      } catch (err) {
-        console.error(`Error scraping Dexscreener for ${mint}:`, err);
-        prices[mint] = null;
-        continue;
-      }
-    }
-
-    // Normal case: fetch from Birdeye for Fartcoin etc
-    try {
-      const birdeyeRes = await fetch(`https://public-api.birdeye.so/public/price?address=${mint}`, {
-        headers: {
-          'Authorization': `Bearer ${birdeyeApiKey}`,
-          'Accept': 'application/json'
-        }
-      });
-
-      if (birdeyeRes.ok) {
-        const birdeyeData = await birdeyeRes.json();
-        if (birdeyeData?.data?.value) {
-          prices[mint] = parseFloat(birdeyeData.data.value);
-        } else {
-          prices[mint] = null;
-        }
-      } else {
-        console.error(`Birdeye fetch failed for ${mint}:`, await birdeyeRes.text());
-        prices[mint] = null;
-      }
-    } catch (err) {
-      console.error(`Error fetching from Birdeye for ${mint}:`, err);
-      prices[mint] = null;
-    }
-  }
-
-  return new Response(JSON.stringify({ prices }), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  });
-}
+            console.error(`Dexscreener price parsing failed for ${mint}`)
