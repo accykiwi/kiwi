@@ -12,6 +12,13 @@ export default async function handler(req) {
 
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
+  const tokenDecimals = {
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900 (9 decimals!!)
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9, // GIGACHAD
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6  // USDC
+  };
+
   const prices = {};
 
   for (const mint of tokenMints) {
@@ -20,8 +27,15 @@ export default async function handler(req) {
       continue;
     }
 
+    // ✅ Only change amount for SPX
+    let amountToQuote = 1000000; // default: 1e6 for 6 decimals
+
+    if (mint === "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr") {
+      amountToQuote = 1000000000; // ✅ SPX needs 1e9 to match 9 decimals
+    }
+
     try {
-      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=1000000`, {
+      const res = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=${amountToQuote}&slippageBps=50`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json'
@@ -38,7 +52,7 @@ export default async function handler(req) {
 
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6;
-        const inAmount = Number(data.inAmount) / 1e6;
+        const inAmount = Number(data.inAmount) / (amountToQuote / 1e6);
 
         const price = outAmount / inAmount;
         prices[mint] = price;
