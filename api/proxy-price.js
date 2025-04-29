@@ -8,7 +8,7 @@ export default async function handler(req) {
     "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr", // SPX6900
     "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9", // GIGACHAD
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"  // ✅ RAY (newly fixed)
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"  // ✅ RAY
   ];
 
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -46,11 +46,10 @@ export default async function handler(req) {
       const data = await res.json();
 
       if (data.outAmount && data.inAmount) {
-        const outAmount = Number(data.outAmount) / 1e6; // normalize USDC always
+        const outAmount = Number(data.outAmount) / 1e6;
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
 
-        const price = outAmount / inAmount; // ✅ Proper division
-
+        const price = outAmount / inAmount; // ✅ Always live
         prices[mint] = price;
       } else {
         prices[mint] = null;
