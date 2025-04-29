@@ -1,12 +1,8 @@
-export const config = {
-  runtime: 'nodejs', // 🚨 NOT 'edge' anymore
-};
-
 export default async function handler(req, res) {
   const tokenMints = {
     "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
+    "J3NKxxXZcnNiMjKw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9, // GIGACHAD
     "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9, // GIGACHAD
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6, // USDC
     "4k3Dyjzvzp8mZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6  // RAY
   };
@@ -28,7 +24,7 @@ export default async function handler(req, res) {
     }
 
     if (mint in dexScreenerPages) {
-      // 🚨 Scrape from Dexscreener webpage for GIGA and SPX
+      // 🚨 Scrape Dexscreener webpage for GIGA and SPX
       try {
         const pageUrl = dexScreenerPages[mint];
         const response = await fetch(pageUrl);
@@ -41,4 +37,47 @@ export default async function handler(req, res) {
             prices[mint] = parseFloat(match[1]);
             continue;
           } else {
-            console.error(`Dexscreener price parsing failed for ${mint}`)
+            console.error(`Dexscreener price parsing failed for ${mint}`);
+            prices[mint] = null;
+            continue;
+          }
+        } else {
+          console.error(`Dexscreener fetch failed for ${mint}:`, await response.text());
+          prices[mint] = null;
+          continue;
+        }
+      } catch (err) {
+        console.error(`Error scraping Dexscreener for ${mint}:`, err);
+        prices[mint] = null;
+        continue;
+      }
+    }
+
+    // 🔵 Fetch from Birdeye normally for Fartcoin
+    try {
+      const birdeyeRes = await fetch(`https://public-api.birdeye.so/public/price?address=${mint}`, {
+        headers: {
+          'Authorization': `Bearer ${birdeyeApiKey}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (birdeyeRes.ok) {
+        const birdeyeData = await birdeyeRes.json();
+        if (birdeyeData?.data?.value) {
+          prices[mint] = parseFloat(birdeyeData.data.value);
+        } else {
+          prices[mint] = null;
+        }
+      } else {
+        console.error(`Birdeye fetch failed for ${mint}:`, await birdeyeRes.text());
+        prices[mint] = null;
+      }
+    } catch (err) {
+      console.error(`Error fetching from Birdeye for ${mint}:`, err);
+      prices[mint] = null;
+    }
+  }
+
+  res.status(200).json({ prices });
+}
