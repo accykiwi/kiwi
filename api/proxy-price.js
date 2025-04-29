@@ -14,6 +14,11 @@ export default async function handler(req) {
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const birdeyeApiKey = "5e03e241b51b4ed3946001c68634ddcf";
 
+  const dexScreenerPages = {
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": "https://dexscreener.com/solana/2wZGhBRVZutphN1Y5AXbVCZxZ62pysez3zrNVqGfTHFS", // SPX pool page
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": "https://dexscreener.com/solana/4twnR1chjTTzoEFcpY5jaCzLfZCgjZL3tNN81GuuhBGe"  // GIGA pool page
+  };
+
   const prices = {};
 
   for (const [mint, decimals] of Object.entries(tokenMints)) {
@@ -22,7 +27,37 @@ export default async function handler(req) {
       continue;
     }
 
-    // Try Birdeye First
+    if (mint in dexScreenerPages) {
+      // Special case: scrape from Dexscreener web page
+      try {
+        const pageUrl = dexScreenerPages[mint];
+        const res = await fetch(pageUrl);
+
+        if (res.ok) {
+          const html = await res.text();
+          const match = html.match(/"priceUsd":([0-9.]+)/);
+
+          if (match && match[1]) {
+            prices[mint] = parseFloat(match[1]);
+            continue;
+          } else {
+            console.error(`Price parsing failed for ${mint}`);
+            prices[mint] = null;
+            continue;
+          }
+        } else {
+          console.error(`Dexscreener fetch failed for ${mint}:`, await res.text());
+          prices[mint] = null;
+          continue;
+        }
+      } catch (err) {
+        console.error(`Error scraping Dexscreener for ${mint}:`, err);
+        prices[mint] = null;
+        continue;
+      }
+    }
+
+    // Normal case: fetch from Birdeye for Fartcoin etc
     try {
       const birdeyeRes = await fetch(`https://public-api.birdeye.so/public/price?address=${mint}`, {
         headers: {
@@ -35,38 +70,15 @@ export default async function handler(req) {
         const birdeyeData = await birdeyeRes.json();
         if (birdeyeData?.data?.value) {
           prices[mint] = parseFloat(birdeyeData.data.value);
-          continue;
-        }
-      } else {
-        console.error(`Birdeye fetch failed for ${mint}:`, await birdeyeRes.text());
-      }
-    } catch (err) {
-      console.error(`Error fetching from Birdeye for ${mint}:`, err);
-    }
-
-    // Fallback to Jupiter
-    try {
-      const amount = Math.pow(10, decimals);
-      const jupiterRes = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=${mint}&outputMint=${USDC_MINT}&amount=${amount}&slippageBps=50`, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-
-      if (jupiterRes.ok) {
-        const jupiterData = await jupiterRes.json();
-        if (jupiterData?.outAmount) {
-          const outAmount = Number(jupiterData.outAmount) / 1e6; // USDC always 6 decimals
-          prices[mint] = outAmount;
         } else {
           prices[mint] = null;
         }
       } else {
-        console.error(`Jupiter fetch failed for ${mint}:`, await jupiterRes.text());
+        console.error(`Birdeye fetch failed for ${mint}:`, await birdeyeRes.text());
         prices[mint] = null;
       }
     } catch (err) {
-      console.error(`Error fetching from Jupiter for ${mint}:`, err);
+      console.error(`Error fetching from Birdeye for ${mint}:`, err);
       prices[mint] = null;
     }
   }
