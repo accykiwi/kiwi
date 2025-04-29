@@ -28,7 +28,7 @@ async function fetchWalletTokens() {
   }).filter(Boolean);
 }
 
-// Fetch all token prices once
+// Fetch all token prices at once
 async function fetchAllTokenPrices() {
   try {
     const res = await fetch('/api/proxy-price');
@@ -72,7 +72,7 @@ async function updateDashboard() {
   document.getElementById('totalValue').innerText = `Total Portfolio Value: $${totalValue.toFixed(2)}`;
 }
 
-// Load dashboard
+// Load dashboard initially
 updateDashboard();
-setInterval(updateDashboard, 60000); // Refresh every 60 seconds
+setInterval(updateDashboard, 60000); // Refresh prices and balances every 60 seconds
 </script>
