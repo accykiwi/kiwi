@@ -1,3 +1,11 @@
+const knownTokenMints = [
+  "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump", // Fartcoin
+  "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr", // SPX6900
+  "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9", // GIGACHAD
+  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+  "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"  // RAY
+];
+
 export default async function handler(req, res) {
   const wallet = "2eb81eBXidrgW6sSzTDnHTEQpqJpmkANMCSRS1BKjUku";
   const solanaEndpoint = "https://api.mainnet-beta.solana.com";
@@ -21,14 +29,10 @@ export default async function handler(req, res) {
     const tokenData = await response.json();
     const allTokens = tokenData?.result?.value || [];
 
-    // ✅ New strict NFT filter
+    // ✅ Filter only known priced mints
     const realTokens = allTokens.filter(acc => {
-      const info = acc?.account?.data?.parsed?.info;
-      const amountRaw = info?.tokenAmount?.amount || "0";
-      const decimals = info?.tokenAmount?.decimals ?? 0;
-
-      // ✅ NFTs always have exact "1" amount and 0 decimals
-      return !(amountRaw === "1" && decimals === 0);
+      const mint = acc?.account?.data?.parsed?.info?.mint;
+      return knownTokenMints.includes(mint);
     });
 
     return res.status(200).json({ result: { value: realTokens } });
