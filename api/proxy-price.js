@@ -14,11 +14,11 @@ export default async function handler(req) {
   const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
   const tokenDecimals = {
-    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6, // Fartcoin
-    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9, // SPX6900
-    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9, // GIGACHAD
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6, // USDC
-    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6  // RAY
+    "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump": 6,
+    "J3NKxxXZcnNiMjKw9hYb2K4LUxgwB6t1FtPtQVsv3KFr": 9,
+    "63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9": 9,
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": 6,
+    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R": 6
   };
 
   const prices = {};
@@ -48,7 +48,7 @@ export default async function handler(req) {
       if (data.outAmount && data.inAmount) {
         const outAmount = Number(data.outAmount) / 1e6; // USDC always 6 decimals
         const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6); // token decimals
-        const price = outAmount / inAmount;
+        const price = inAmount / outAmount; // ✅ FIX: Correct division direction!
         prices[mint] = price;
       } else {
         prices[mint] = null;
