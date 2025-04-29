@@ -46,8 +46,8 @@ export default async function handler(req) {
       const data = await res.json();
 
       if (data.outAmount) {
-        const outAmount = Number(data.outAmount) / Math.pow(10, tokenDecimals[mint] || 6); // normalize by token decimals
-        const price = 1 / outAmount; // ✅ 1 USDC divided by how many tokens
+        const realTokenAmount = Number(data.outAmount) / Math.pow(10, tokenDecimals[mint]);
+        const price = 1 / realTokenAmount;
         prices[mint] = price;
       } else {
         prices[mint] = null;
