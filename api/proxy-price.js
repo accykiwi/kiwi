@@ -40,26 +40,3 @@ export default async function handler(req) {
         prices[mint] = null;
         continue;
       }
-
-      const data = await res.json();
-
-      if (data.outAmount && data.inAmount) {
-        const outAmount = Number(data.outAmount) / 1e6;
-        const inAmount = Number(data.inAmount) / Math.pow(10, tokenDecimals[mint] || 6);
-        const price = outAmount / inAmount;
-        prices[mint] = price;
-      } else {
-        prices[mint] = null;
-      }
-
-    } catch (error) {
-      console.error(`Error processing price for ${mint}:`, error);
-      prices[mint] = null;
-    }
-  }
-
-  return new Response(JSON.stringify({ prices }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' }
-  });
-}
